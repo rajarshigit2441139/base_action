@@ -1,0 +1,89 @@
+name: Shared Docker Build & Push Action
+description: Generic Docker build & push step
+
+inputs:
+  arch:
+    description: Architecture to build for (e.g., amd64, arm64)
+    required: true
+  context:
+    description: Context directory for the Docker build
+    required: true
+  dockerfile:
+    description: Path to the Dockerfile relative to the context
+    required: true
+  tag_prefix:
+    description: Prefix for the Docker image tags
+    required: true
+  version:
+    description: Version of the Docker image
+    required: false
+  push:
+    description: Whether to push the image to the registry
+    required: false
+    default: "false"
+  github_token:
+    description: GitHub token for authentication with the registry
+    required: false
+  pull_token:
+    description: Token used only for pulling base images (e.g., classic PAT)
+    required: false
+    
+
+outputs:
+  version:
+    description: The version of the Docker image built
+    value: ${{ inputs.version }}
+  tag_prefix:
+    description: The prefix used for the Docker image tags
+    value: ${{ inputs.tag_prefix }}
+  ci_build_no:
+    description: Build number of an ci pipeline for current run
+    value:  ${{ steps.extract-build-no.outputs.ci_build_no }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@5
+
+    - uses: docker/setup-qemu-action@v3
+
+    - uses: docker/setup-buildx-action@v3
+
+    - name: CI build number
+      id: extract-build-no
+      shell: bash
+      run: |
+       trimmed_run_number="$(echo -n "${{ github.run_number }}" | tr -d '[:space:]')"
+       echo "ci_build_no=$trimmed_run_number" >> $GITHUB_OUTPUT
+
+    - name: Login to GHCR for Pull
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.pull_token || inputs.github_token }}
+
+    - name: Logout before reauth
+      if: inputs.push == 'true'
+      shell: bash
+      run: docker logout ghcr.io
+
+    - name: Login to GHCR for Push 
+      if: inputs.push == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github_token }}
+
+    - name: Build and optionally push Docker image
+      uses: docker/build-push-action@v6
+      with:
+        platforms: linux/${{ inputs.arch }} 
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        build-args: | 
+          TARGETARCH=${{ inputs.arch }}
+        push: ${{ inputs.push }}
+        load: ${{ inputs.push != 'true' }}
+        tags: ${{ inputs.tag_prefix }}-${{ inputs.arch }}:${{ inputs.version }}-${{ steps.extract-build-no.outputs.ci_build_no }}
