@@ -57,7 +57,7 @@ runs:
 
     - name: Build using shared logic
       id: call-parent
-      uses: rajarshigit2441139/base_action/parent_action@parent_v1.0.1
+      uses: rajarshigit2441139/base_action/parent_action@parent_v1.0.2
       with:
         arch: ${{ inputs.arch }}
         context: ${{ inputs.context }}
