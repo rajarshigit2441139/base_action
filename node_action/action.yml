@@ -47,12 +47,8 @@ runs:
       id: extract
       shell: bash
       run: |
-        version=$(awk -F: "/^FROM ${{ inputs.base_name }}:/ { print \$2 }" "${{ inputs.dockerfile }}" | xargs)
-        echo "Extracted version: $version" 
-        if [ -z "$version" ]; then
-          echo "Failed to extract node version"
-          exit 1
-        fi
+        version=$(awk -F'-' '{ sub(/^v/, "", $2); print $2 }' Dockerfile)
+        echo "Extracted version: $version"
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Build using shared logic
@@ -66,3 +62,4 @@ runs:
         version: ${{ steps.extract.outputs.version }}
         push: ${{ inputs.push }}
         github_token: ${{ inputs.github_token }}
+
