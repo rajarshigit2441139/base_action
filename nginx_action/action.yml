@@ -1,0 +1,76 @@
+name: NGINX Docker Builder
+description: Builds NGINX-based Docker images and extracts the version from the Dockerfile using parent-build logic.
+
+inputs:
+  arch:
+    description: Architecture to build for (e.g., amd64, arm64)
+    required: true
+  context:
+    description: Context directory for the Docker build
+    required: true
+  dockerfile:
+    description: Path to the Dockerfile relative to the context
+    required: true
+  tag_prefix:
+    description: Prefix for the Docker image tags
+    required: true
+  version:
+    description: Version of the Docker image
+    required: false
+  push:
+    description: Whether to push the image to the registry
+    required: false
+    default: "false"
+  github_token:
+    description: GitHub token for authentication with the registry
+    required: false
+  nginx_regex:
+    description: Regular expression to match the Nginx version in the Dockerfile
+    required: true
+    default: "nginx:([0-9]+\\.[0-9]+)(?:-[^\\s]+)?"
+
+
+
+outputs:
+  tag_prefix:
+    description: The prefix used for the Docker image tags
+    value: ${{ inputs.tag_prefix }}
+  version:
+    description: Extracted NGINX version
+    value: ${{ steps.extract.outputs.version }}
+  ci_build_no:
+    description: Build number from parent-build
+    value: ${{ steps.call-parent.outputs.ci_build_no }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Extract NGINX version
+      id: extract
+      shell: bash
+      run: |
+        version=$(awk -v regex="${{ inputs.nginx_regex }}" '
+          {
+            if ($0 ~ regex) {
+              match($0, regex, m)
+              print m[1]
+              exit
+            }
+          }' "${{ inputs.dockerfile }}")
+        if [ -z "$version" ]; then
+          echo "Failed to extract Nginx version"
+          exit 1
+        fi
+        echo "version=$version" >> $GITHUB_OUTPUT
+
+    - name: Build using shared logic
+      id: call-parent
+      uses: rajarshigit2441139/base_action/parent_action@parent_v1.0.2
+      with:
+        arch: ${{ inputs.arch }}
+        context: ${{ inputs.context }}
+        dockerfile: ${{ inputs.dockerfile }}
+        tag_prefix: ${{ inputs.tag_prefix }}
+        version: ${{ steps.extract.outputs.version }}     
+        push: ${{ inputs.push }}
+        github_token: ${{ inputs.github_token }}
