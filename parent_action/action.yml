@@ -86,4 +86,4 @@ runs:
           TARGETARCH=${{ inputs.arch }}
         push: ${{ inputs.push }}
         load: ${{ inputs.push != 'true' }}
-        tags: ${{ inputs.tag_prefix }}-${{ inputs.version }}-${{ inputs.arch }}:${{ steps.extract-build-no.outputs.ci_build_no }}
+        tags: ${{ inputs.tag_prefix }}-${{ inputs.arch }}-b${{ steps.extract-build-no.outputs.ci_build_no }}:${{ inputs.version }}
